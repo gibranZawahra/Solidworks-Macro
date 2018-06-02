@@ -1,0 +1,1866 @@
+'Declarations pour sldwrks
+Dim swEqnMgr As SldWorks.EquationMgr
+Dim swCEqnMgr As SldWorks.EquationMgr
+Dim Part As Object
+Dim swApp  As SldWorks.SldWorks
+Dim swAssy  As SldWorks.AssemblyDoc
+Dim swcomponent As SldWorks.Component2
+Dim Selmgr As SldWorks.SelectionMgr
+Dim swModel  As SldWorks.ModelDoc2
+Dim swComp   As SldWorks.Component2
+Dim swCustPropMgr As SldWorks.CustomPropertyManager
+Dim config As SldWorks.Configuration
+Dim swDocSpecification As SldWorks.DocumentSpecification
+Dim sName As String
+Dim longstatus As Long, longwarnings As Long
+
+'Declatrations pour
+'applicaton excel
+Dim xlApp    As Excel.Application
+'workbook excel
+Dim xlWB     As Excel.Workbook
+'feuille excel
+Dim xlwks    As Excel.Worksheet
+'derniere case remplie dans excel
+Dim lEc
+'nom client
+Dim client   As String
+'compteur
+Dim Comp   As Variant
+'variable pour recherche de nom client et affaire
+Dim SFR      As Range
+Dim WTL      As Range
+'variable fichier
+Dim File As Object
+'address de la case nom client dans excel
+Dim clientAddress As Range
+'address a rechercher pour l'affichage automatique du nom client et affaire
+Dim addressFound As Range
+'variable necessaire pour effacage affichage composant,fonctions et autres dans le 3d
+Dim boolstatus As Boolean
+'division pour le calcul de
+Dim Div As Integer
+'compteur pour fonction
+Dim i As Integer
+'longueur reelle
+Dim MV As Single
+'variable sans/avec serrure
+Dim SS As Boolean
+'nombre barreaux
+Dim NB As Integer
+'variable pour calcul distance butée
+Dim DB As Integer
+'hauteur serrure
+Dim HS As Integer
+'position galet
+Dim PG As Integer
+
+Dim lUpperPart As Long 'variable pour fraction echelle
+Dim lLowerPart As Long ' variable pour fraction echelle
+Dim mepscale As Single 'variable pour echelle mise en plan
+Dim PATHv As String ' variable repertoire actuelle
+
+
+
+
+
+
+
+
+'Option Explicit
+
+
+
+
+'Fonction pour changer nom client et Affaire automatiquement sur changement du numero de commande
+Private Sub ComboBox1_Change()
+
+Set WTL = ActiveSheet.Columns(3)
+ Set SFR = WTL.Cells.Find(what:=ComboBox1.Value, LookAt:=xlWhole)
+    'MsgBox SFR.Offset(RowOffSet:=0, ColumnOffset:=-2)
+    If SFR Is Nothing Then
+    DoEvents
+    Else
+  TextBox1.Value = SFR.Offset(RowOffSet:=0, ColumnOffset:=-2)
+  TextBox2.Value = SFR.Offset(RowOffSet:=0, ColumnOffset:=-1)
+    End If
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+'Function pour le button reconstruire
+Private Sub CommandButton1_Click()
+'Image1.visible = True
+'ouverture du fichier d'equation s'il ne l'est pas deja
+
+If Not IsFileOpen("G:\technique\Gibran\EUROFENCE\SW\equations.txt") Then
+'pour etre sur
+Close #1
+Open "G:\technique\Gibran\EUROFENCE\SW\equations.txt" For Output As #1
+
+End If
+'affectation des objets sldwrks
+ Set swApp = Application.SldWorks
+ Set swModel = swApp.ActiveDoc
+ Set config = swModel.GetActiveConfiguration
+ Set swCustPropMgr = config.CustomPropertyManager
+'verification des données du combobox passage
+If Not IsNumeric(ComboBox2.Value) Then
+MsgBox "Entrez un nombre"
+Close #1
+Exit Sub
+ElseIf ComboBox2.Value < 1000 Then
+MsgBox "Passage trop petit"
+Close #1
+Exit Sub
+ElseIf ComboBox3.Value > 8000 Then
+MsgBox "Passage trop grand, passer en serie 190"
+Close #1
+Exit Sub
+ElseIf ComboBox2.Value >= 1000 Then
+'calcul pour modifier le fichier equation et les proprietes personalisé
+Div = ComboBox2.Value Mod 10
+If Div = 0 Then
+Print #1, """Passage""= " & ComboBox2.Value
+For i = 385 To 505
+MV = (((ComboBox2.Value) + i) - 345)
+MV = MV Mod 130
+If MV = 0 Then
+MV = ComboBox2.Value + i
+NB = ((MV - 345) / 130) + 1
+DB = MV
+Print #1, """LongueurReelle""= " & MV
+swCustPropMgr.Add3 "•Client", swCustomInfoText, TextBox1.Value, swCustomPropertyReplaceValue
+swCustPropMgr.Add3 "•Affaire", swCustomInfoText, TextBox2.Value, swCustomPropertyReplaceValue
+swCustPropMgr.Add3 "•Cde_N°", swCustomInfoText, ComboBox1.Value, swCustomPropertyReplaceValue
+swCustPropMgr.Add3 "•Hautueur en lettre", swCustomInfoText, ComboBox3.Value / 1000, swCustomPropertyReplaceValue
+swCustPropMgr.Add3 "•Long en lettre", swCustomInfoText, ComboBox2.Value / 1000, swCustomPropertyReplaceValue
+swCustPropMgr.Add3 "•Dessinateur", swCustomInfoText, ComboBox5.Value, swCustomPropertyReplaceValue
+
+'affectation du nombre poteaux suivant configuration
+ If CheckBox2.Value = True Then
+ If CheckBox3.Value = True Then
+ swCustPropMgr.Add3 "•Nombre poteaux", swCustomInfoText, "4", swCustomPropertyReplaceValue
+ ElseIf CheckBox3.Value = False Then
+ swCustPropMgr.Add3 "•Nombre poteaux", swCustomInfoText, "3", swCustomPropertyReplaceValue
+ End If
+ ElseIf CheckBox2.Value = False Then
+ If CheckBox3.Value = True Then
+ swCustPropMgr.Add3 "•Nombre poteaux", swCustomInfoText, "3", swCustomPropertyReplaceValue
+ ElseIf CheckBox3.Value = False Then
+ swCustPropMgr.Add3 "•Nombre poteaux", swCustomInfoText, "2", swCustomPropertyReplaceValue
+ End If
+ End If
+ 'print nombre barreaux dans fichier equation
+Print #1, """NombreBarreaux""= " & NB
+'calcul position galet
+PG = Int((MV - 2) * 0.18)
+Print #1, """PositionGalet""= " & PG
+
+
+End If
+Next i
+ElseIf Not Div = 0 Then
+MsgBox "les mesures devraient etre au centimetre pres"
+End If
+End If
+'verification données hautueur
+If Not IsNumeric(ComboBox3.Value) Then
+MsgBox "Entrez un nombre"
+Close #1
+Exit Sub
+ElseIf ComboBox3.Value < 500 Then
+MsgBox "Hautueur trop petite"
+Close #1
+Exit Sub
+ElseIf ComboBox3.Value > 2500 Then
+MsgBox "Hautueur trop grande, a faire en deux partie"
+Close #1
+Exit Sub
+ElseIf ComboBox3.Value >= 500 Then
+Div = ComboBox3.Value Mod 10
+If Div = 0 Then
+'comparaison pour decider hautueur serrure
+If ComboBox3.Value <= 1135 Then
+HS = ComboBox3.Value - 442
+Print #1, """HautueurSerrure""= " & HS
+
+ElseIf ComboBox3.Value > 1135 Then
+HS = 742
+Print #1, """HautueurSerrure""= " & HS
+End If
+'hautueur des poteaux de guidage et de reception
+Print #1, """HautueurHorsSol""= " & ComboBox3.Value
+
+ElseIf Not Div = 0 Then
+MsgBox "les mesures devraient etre au centimetre pres"
+Exit Sub
+End If
+End If
+
+'print données suivant scellement puisque les distances varies.
+'si scellé
+If CheckBox4.Value = True Then
+Print #1, """largeurGuidageLongrine""= 700"
+Print #1, """largueurReceptionLongrine""= 500"
+Print #1, """hautueurPoteaux""= " & ComboBox3.Value + 600
+Print #1, """hautueurGache""= " & HS + 600
+Print #1, """hautueurTrapPoteau""= " & 843
+Print #1, """distanceButee""= " & (DB + ComboBox2.Value - 16)
+Print #1, """largueurPassageLongrine""= " & ComboBox2.Value - 400
+swCustPropMgr.Add3 "•Nombre rail", swCustomInfoText, Round(((DB + ComboBox2.Value - 16) - (MV * 0.18) + 100) / 3000, 0), swCustomPropertyReplaceValue
+If CheckBox5.Value = True Then
+swCustPropMgr.Add3 "•Code rail", swCustomInfoText, "RAIL20020RV3", swCustomPropertyReplaceValue
+'sinon
+Else
+swCustPropMgr.Add3 "•Code rail", swCustomInfoText, "PF3A102SBRUT", swCustomPropertyReplaceValue
+End If
+ElseIf CheckBox4.Value = False Then
+Print #1, """largueurGuidageLongrine""= 800"
+Print #1, """largueurReceptionLongrine""= 400"
+Print #1, """hautueurPoteaux""= " & ComboBox3.Value + 32
+Print #1, """hautueurGache""= " & HS
+Print #1, """hautueurTrapPoteau""= " & 243
+Print #1, """distanceButee""= " & (DB + ComboBox2.Value - 16 + 50)
+Print #1, """largueurPassageLongrine""= " & ComboBox2.Value - 300
+swCustPropMgr.Add3 "•Nombre rail", swCustomInfoText, Round(((DB + ComboBox2.Value - 16 + 50) - (MV * 0.18) + 100) / 3000, 0), swCustomPropertyReplaceValue
+If CheckBox5.Value = True Then
+'affichage du code article rail suivant le type de rail
+swCustPropMgr.Add3 "•Code rail", swCustomInfoText, "RAIL20020RV3", swCustomPropertyReplaceValue
+Else
+
+swCustPropMgr.Add3 "•Code rail", swCustomInfoText, "PF3A102SBRUT", swCustomPropertyReplaceValue
+End If
+End If
+
+Debug.Print Round(((DB + ComboBox2.Value - 16 + 50) - (MV * 0.18) + 100) / 3000, 0)
+
+Close #1
+
+boolstatus = swModel.Extension.SelectByID2("Largeur3", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Largeur10", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+progress (10)
+
+If CheckBox5.Value = True Then
+'omega
+Call Rail(1)
+If CheckBox4 = True Then
+Call milieuRemplissageLongrine(1, 1)
+ElseIf CheckBox4 = False Then
+Call milieuRemplissageLongrine(0, 1)
+End If
+
+ElseIf CheckBox5.Value = False Then
+'ipn
+Call Rail(0)
+If CheckBox4 = True Then
+Call milieuRemplissageLongrine(1, 0)
+ElseIf CheckBox4 = False Then
+Call milieuRemplissageLongrine(0, 0)
+End If
+
+End If
+progress (20)
+If CheckBox2.Value = True Then
+
+If CheckBox4.Value = True Then
+Call showPoteauReception(1, 0)
+Call showPoteauReception(0, 0)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauReception(1, 1)
+Call showPoteauReception(0, 1)
+End If
+
+progress (30)
+
+If CheckBox1.Value = True Then
+
+If CheckBox8.Value = True Then
+'passage a droite poteau a droite et serrurie a gauche
+Call Gache(1, 1, 1)
+Call showSerrurie(0)
+ElseIf CheckBox8.Value = False Then
+'passage a gauche poteau a gauche et serrurie a droite
+Call Gache(1, 1, 1)
+Call showSerrurie(1)
+End If
+progress (40)
+
+ElseIf CheckBox1.Value = False Then
+Call hideSerrurie
+Call Gache(1, 1, 0)
+End If
+
+ElseIf CheckBox2.Value = False Then
+If CheckBox8.Value = True Then
+'passage a droite poteau a droite et serrurie a gauche
+
+If CheckBox4.Value = True Then
+Call showPoteauReception(1, 0)
+Call hidePoteauReception(0)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauReception(1, 1)
+Call hidePoteauReception(0)
+End If
+
+progress (40)
+
+If CheckBox1.Value = True Then
+Call showSerrurie(0)
+Call Gache(0, 1, 1)
+ElseIf CheckBox1 = False Then
+Call Gache(0, 1, 0)
+Call hideSerrurie
+End If
+
+progress (50)
+
+ElseIf CheckBox8.Value = False Then
+'passage a gauche poteau a gauche et serrurie a droite
+If CheckBox4.Value = True Then
+Call showPoteauReception(0, 0)
+Call hidePoteauReception(1)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauReception(0, 1)
+Call hidePoteauReception(1)
+End If
+progress (50)
+If CheckBox1.Value = True Then
+Call showSerrurie(1)
+Call Gache(0, 0, 1)
+ElseIf CheckBox1 = False Then
+Call Gache(0, 0, 0)
+Call hideSerrurie
+End If
+End If
+
+End If
+progress (60)
+
+If CheckBox3.Value = True Then
+
+If CheckBox4.Value = True Then
+Call showPoteauGuidage(0, 0)
+Call showPoteauGuidage(1, 0)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauGuidage(0, 1)
+Call showPoteauGuidage(1, 1)
+End If
+progress (70)
+ElseIf CheckBox3.Value = False Then
+If CheckBox8.Value = True Then
+'passage a droite poteau a droite et serrurie a gauche
+
+If CheckBox4.Value = True Then
+Call showPoteauGuidage(1, 0)
+Call hidePoteauGuidage(0)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauGuidage(1, 1)
+Call hidePoteauGuidage(0)
+End If
+progress (70)
+ElseIf CheckBox8.Value = False Then
+'passage a gauche poteau a gauche et serrurie a droite
+progress (70)
+If CheckBox4.Value = True Then
+Call showPoteauGuidage(0, 0)
+Call hidePoteauGuidage(1)
+ElseIf CheckBox4.Value = False Then
+Call showPoteauGuidage(0, 1)
+Call hidePoteauGuidage(1)
+End If
+progress (80)
+End If
+progress (90)
+End If
+
+
+If CheckBox6.Value = True Then
+'MsgBox "si le portail est manuel il ne sera plus conforme car hautueur <2m"
+Herse (1)
+ElseIf CheckBox6.Value = False Then
+Herse (0)
+End If
+
+Call correctMates
+progress (100)
+boolstatus = swModel.EditRebuild3()
+boolstatus = swModel.Extension.EditRebuildAll()
+boolstatus = swModel.EditRebuild3()
+
+progress (200)
+    'Image1.visible = False
+    
+boolstatus = swModel.Extension.SelectByID2("Largeur3", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Largeur10", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+boolstatus = swModel.EditRebuild3()
+boolstatus = swModel.Extension.EditRebuildAll()
+boolstatus = swModel.EditRebuild3()
+End Sub
+
+
+
+
+
+
+Private Sub CommandButton2_Click()
+
+ 'Call showAll
+Call MepLongrine
+End Sub
+
+
+Private Sub CommandButton3_Click()
+Call showAll
+
+End Sub
+
+Private Sub CommandButton4_Click()
+'Call showAll
+Call MepVantail
+End Sub
+
+Sub UserForm_Initialize()
+
+
+
+
+ 
+ Set swApp = Application.SldWorks
+ Set swModel = swApp.ActiveDoc
+ Set swEqnMgr = swModel.GetEquationMgr
+ Set Selmgr = swModel.SelectionManager
+
+'  wb.Close SaveChanges:=True
+'If Not IsFileOpen("G:\technique\Gibran\EUROFENCE\SW\equations.txt") Then
+'Open "G:\technique\Gibran\EUROFENCE\SW\equations.txt" For Input As #1
+'End If
+'MsgBox "File = " & swModel.GetPathName
+'MsgBox "  Status = " & swEqnMgr.Status
+'nCount = swEqnMgr.GetCount
+
+        'MsgBox "  Eqn()  = " & swEqnMgr.Equation(3)
+        'MsgBox "    Value  = " & swEqnMgr.value(3)
+        'MsgBox "    Supp   = " & swEqnMgr.Suppression(1)
+'UserForm1.BackColor = &H0&
+ComboBox2.List = Array("3000", "3500", "4000", "4500", "5000", "5500", "6000", "6500", "7000", "7500", "8000")
+ComboBox3.List = Array("1500", "1750", "2000", "2250", "2500")
+ComboBox4.List = Array("6005", "7016", "7037", "7030", "9005", "9010")
+ComboBox5.List = Array("GZ", "ALG", "DVL")
+Set xlApp = CreateObject("Excel.application")
+xlApp.visible = True
+
+'Make sure instance is visible
+'xlApp.visible = True
+
+'Workbooks.quit ("G:\technique\Gibran\EUROFENCE\Excel\DB.xlsx")
+'Workbooks.Close ("G:\technique\Gibran\EUROFENCE\Excel\DB.xlsx")
+'Workbooks.Close ("G:\technique\Gibran\EUROFENCE\Excel\DB.xlsx")
+   'On Error Resume Next
+'Workbooks("DB.xlsx").Close SaveChanges:=False
+ '  On Error Resume Next
+'Workbooks("DB.xlsx").Close SaveChanges:=False
+ '  On Error Resume Next
+'Workbooks("DB.xlsx").Close SaveChanges:=False
+  ' On Error Resume Next
+ Debug.Print "1"
+
+
+Set xlWB = xlApp.Workbooks.Open("G:\technique\Gibran\EUROFENCE\Excel\DB.xlsx")
+ Debug.Print "2"
+ ActiveWorkbook.RefreshAll
+ DoEvents
+ DoEvents
+'Application.Wait (Now + TimeValue("0:00:10"))
+
+
+If IsFileOpen("G:\technique\Gibran\EUROFENCE\Excel\DB.xlsx") Then
+Set xlwks = xlWB.Sheets("Feuil2")
+ Debug.Print "3"
+xlwks.Activate
+ Debug.Print "4"
+'ActiveWorkbook.RefreshAll
+DoEvents
+'Call Refresh_All_Data_Connections
+'find last cell in excel to avoid blank choices
+ Debug.Print "5"
+lEc = xlWB.Worksheets("Feuil2").Range("C" & Rows.Count).End(xlUp).Address
+'populate list
+ Debug.Print "6"
+UserForm1.ComboBox1.List = Worksheets("Feuil2").Range("C$9330:" + lEc).Value
+ Debug.Print "7"
+Else
+ Debug.Print "8"
+Call UserForm_Initialize
+ Debug.Print "9"
+End If
+
+End Sub
+
+
+
+
+
+Function showSerrurie(direction As Boolean)
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("LSKZ 100_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.1@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.2@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+swModel.ClearSelection2 True
+
+If direction = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+ElseIf direction = False Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function hideSerrurie()
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("LSKZ 100_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.1@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.2@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@Vantail Variables Globales-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+End Function
+
+
+
+
+
+Function Gache(style As Boolean, direction As Boolean, present As Boolean)
+
+swModel.ClearSelection2 True
+If present = True Then
+
+If style = True Then
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/GACHE DOUBLE A VISSER-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-8@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-9@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-14@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-4@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+swModel.ClearSelection2 True
+
+
+
+
+ElseIf style = False Then
+
+If direction = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-4@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/GACHE DOUBLE A VISSER-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "BODYFEATURE", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-14@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-8@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-9@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+
+ElseIf direction = False Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/GACHE DOUBLE A VISSER-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-8@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-9@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-4@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-14@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+swModel.ClearSelection2 True
+End If
+
+End If
+
+
+
+ElseIf present = False Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-4@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Gâche à VISSER_1-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/GACHE DOUBLE A VISSER-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-8@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-9@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Diamètre du perçage Ø11.2 (11.2)1@PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-14@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Rondelle élastique conique M8-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Vis TCHC 8x40-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/INSERT M8 AKS4812538-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+
+Function showPoteauReception(direction As Boolean, platine As Boolean)
+If CheckBox2.Value = True Then
+boolstatus = swModel.Extension.SelectByID2("Coïncidente219", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+Else
+boolstatus = swModel.Extension.SelectByID2("Coïncidente219", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+End If
+
+
+swModel.ClearSelection2 True
+If direction = True Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 100x100-6@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Boss.-Extru.2@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+If platine = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.5@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)_1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-10@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-11@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+ElseIf platine = False Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)_1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-10@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-11@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.5@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+
+End If
+ElseIf direction = False Then
+
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 100x100-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Boss.-Extru.1@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+If platine = True Then
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.3@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-13@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-16@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-15@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-17@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+ElseIf platine = False Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-13@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-16@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-15@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-17@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.3@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+End If
+swModel.ClearSelection2 True
+End If
+
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function hidePoteauReception(direction As Boolean)
+swModel.ClearSelection2 True
+If direction = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Boss.-Extru.2@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/Tube carré_1-1@Poteau AP-CSR (stock)_1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 100x100-6@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-2@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.5@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Poteau AP-CSR (stock)_1-1@PTX RECEPTION/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)_1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-5@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-10@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-11@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-12@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+ElseIf direction = False Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Boss.-Extru.1@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Tube carré_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 100x100-7@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Embout pour tube 120x60-3@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.3@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-13@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-16@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-15@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1/Goujon M12x115 HST_1-17@PTX RECEPTION", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function showPoteauGuidage(direction As Boolean, platine As Boolean)
+swModel.ClearSelection2 True
+If direction = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Tube carré-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 100x100-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 120x60-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+swModel.ClearSelection2 True
+
+
+If platine = True Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+ElseIf platine = False Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+swModel.ClearSelection2 True
+End If
+ElseIf direction = False Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 100x100-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Tube carré-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 120x60-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+If platine = True Then
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+
+ElseIf platine = False Then
+
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+End If
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function hidePoteauGuidage(direction As Boolean)
+If direction = True Then
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Tube carré-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 100x100-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 120x60-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.6@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-1@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+
+swModel.ClearSelection2 True
+
+
+ElseIf direction = False Then
+swModel.ClearSelection2 True
+
+
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 100x100-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Tube carré-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/Embout pour tube 120x60-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Enlèv. mat.-Extru.4@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1/PLATINE 200x200 (PPG 203348)_1-3@Poteau AP-CSR (stock)", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+
+End If
+End Function
+
+Function Rail(style As Boolean)
+swModel.ClearSelection2 True
+If style = True Then
+boolstatus = swModel.Extension.SelectByID2("Extrusion2@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rail IPN-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("RAIL OMEGA 3M-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+
+swModel.ClearSelection2 True
+ElseIf style = False Then
+swModel.ClearSelection2 True
+
+boolstatus = swModel.Extension.SelectByID2("Extrusion2@LONGRINE-1@Assemblage 1", "BODYFEATURE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Rail IPN-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("RAIL OMEGA 3M-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function milieuRemplissageLongrine(visible As Boolean, style As Boolean)
+If visible = True Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+
+If style = True Then
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 600-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Distance46", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+ElseIf style = False Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 600-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Distance46", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+End If
+swModel.ClearSelection2 True
+ElseIf visible = False Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 600-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Distance46", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+End If
+End Function
+
+
+Function Herse(visible As Boolean)
+
+If visible = True Then
+swModel.ClearSelection2 True
+'MsgBox "visible"
+boolstatus = swModel.Extension.SelectByID2("Herse-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+ElseIf visible = False Then
+boolstatus = swModel.Extension.SelectByID2("Herse-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+End If
+swModel.ClearSelection2 True
+End Function
+
+
+
+Function showAll()
+
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Vantail Variables Globales-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("BOOMERANG COMPLET CXC-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Galet Ø30 BOOMERANG CXC-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("GALET DE ROULEMENT_S120-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique3", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Embout pour tube 60x60-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Embout pour tube 60x60-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("bouchon tole tube 120x60-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("bouchon tole tube 120x60-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique2", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique1", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("LONGRINE-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("FP 40 40 0X_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("FZ 40 12 PX_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("FZ 40 12 PX_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("FP 40 40 0X_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+CheckBox1.Value = True
+CheckBox2.Value = True
+CheckBox3.Value = True
+CheckBox4.Value = True
+CheckBox5.Value = True
+CheckBox6.Value = True
+CheckBox8.Value = True
+
+Call CommandButton1_Click
+
+End Function
+
+
+Function MepVantail()
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("LSKZ 100_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("LONGRINE-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rail IPN-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("FP 40 40 0X_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("FZ 40 12 PX_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("FZ 40 12 PX_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("FP 40 40 0X_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M10x110 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Poteau AP-CSR (stock)-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("PTX RECEPTION-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("RAIL OMEGA 3M-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-7@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Goujon M12x115 HST_1-8@Assemblage 1", "COMPONENT", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-3@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour pouteau-4@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 600-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("TIRARD_ARRET DE PORTE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Remplissage longrine pour milieu 700-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique3", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+
+Set swApp = Application.SldWorks
+If CheckBox8 = True Then
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep vantailD.SLDDRW")
+Else
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep vantailG.SLDDRW")
+End If
+sName = swDocSpecification.filename
+
+swDocSpecification.DocumentType = swDocDRAWING
+
+swDocSpecification.ReadOnly = False
+
+swDocSpecification.Silent = False
+
+Set swModel = swApp.OpenDoc7(swDocSpecification)
+
+longstatus = swDocSpecification.Error
+
+longwarnings = swDocSpecification.Warning
+
+End Function
+
+Function MepLongrine()
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Vantail Variables Globales-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("BOOMERANG COMPLET CXC-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Galet Ø30 BOOMERANG CXC-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("GALET DE ROULEMENT_S120-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("LSKZ 100_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique3", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Embout pour tube 60x60-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Embout pour tube 60x60-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("bouchon tole tube 120x60-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("bouchon tole tube 120x60-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique2", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Composant symétrique1", "COMPPATTERN", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Herse-1@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Rondelle type L M8-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-6@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Vis TBHC M8 x 30 inox A2_1-5@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Arret porte ATTACHE_1-2@Assemblage 1", "COMPONENT", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+Set swApp = Application.SldWorks
+If CheckBox8 = True Then
+
+If CheckBox5 = True Then
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep Longrine D O.SLDDRW")
+Else
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep Longrine D I.SLDDRW")
+
+End If
+Else
+If CheckBox5 = True Then
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep Longrine G O.SLDDRW")
+Else
+Set swDocSpecification = swApp.GetOpenDocSpec("G:\technique\Gibran\EUROFENCE\SW\Mep Longrine G I.SLDDRW")
+
+End If
+End If
+sName = swDocSpecification.filename
+
+swDocSpecification.DocumentType = swDocDRAWING
+
+swDocSpecification.ReadOnly = False
+
+swDocSpecification.Silent = False
+Set swModel = swApp.OpenDoc7(swDocSpecification)
+longstatus = swDocSpecification.Error
+longwarnings = swDocSpecification.Warning
+
+
+
+
+End Function
+
+
+
+Function InspectConfigurations(swModel As SldWorks.ModelDoc2)
+    Dim params As Variant
+    params = swModel.GetConfigurationNames
+    Dim vName As Variant
+    Dim Name As String
+    Dim thisConfig As Configuration
+    For Each vName In params
+        Name = vName
+        Set thisConfig = swModel.GetConfigurationByName(Name)
+        Debug.Print "Name                      ", thisConfig.Name
+        ' Work out what the BOM part number is based on any derived configurations
+        'Debug.Print "BOMswModelNumber             ", BOMswModelNumber(thisConfig, swModel)
+        Debug.Print "AlternateName             ", thisConfig.AlternateName
+        Debug.Print "Comment                   ", thisConfig.Comment
+        Debug.Print "Description               ", thisConfig.Description
+        Debug.Print "HideNewComponentModels    ", thisConfig.HideNewComponentModels
+        Debug.Print "Lock                      ", thisConfig.Lock
+        Debug.Print "ShowChildComponentsInBOM  ", thisConfig.ShowChildComponentsInBOM
+        Debug.Print "UseAlternateNameInBOM     ", thisConfig.UseAlternateNameInBOM
+        Debug.Print "SuppressNewComponentModels", thisConfig.SuppressNewComponentModels
+        Debug.Print "SuppressNewFeatures       ", thisConfig.SuppressNewFeatures
+        Debug.Print "------------------------------------------------------------------"
+    Next vName
+End Function
+
+
+Function progress(prog As Integer)
+
+
+
+Select Case prog
+    Case 10
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Caption = "10% Complete"
+        UserForm1.Repaint
+    Case 20
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Caption = "20% Complete"
+        UserForm1.Repaint
+    Case 30
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Caption = "30% Complete"
+        UserForm1.Repaint
+    Case 40
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Caption = "40% Complete"
+        UserForm1.Repaint
+    Case 50
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Caption = "50% Complete"
+        UserForm1.Repaint
+    Case 60
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Frame6.visible = True
+        UserForm1.Caption = "60% Complete"
+        UserForm1.Repaint
+    Case 70
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Frame6.visible = True
+        UserForm1.Frame7.visible = True
+        UserForm1.Caption = "70% Complete"
+        UserForm1.Repaint
+    Case 80
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Frame6.visible = True
+        UserForm1.Frame7.visible = True
+        UserForm1.Frame8.visible = True
+        UserForm1.Caption = "80% Complete"
+        UserForm1.Repaint
+    Case 90
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Frame6.visible = True
+        UserForm1.Frame7.visible = True
+        UserForm1.Frame8.visible = True
+        UserForm1.Frame9.visible = True
+        UserForm1.Caption = "90% Complete"
+        UserForm1.Repaint
+    Case 100
+        UserForm1.Frame0.visible = True
+        UserForm1.Frame1.visible = True
+        UserForm1.Frame2.visible = True
+        UserForm1.Frame3.visible = True
+        UserForm1.Frame4.visible = True
+        UserForm1.Frame5.visible = True
+        UserForm1.Frame6.visible = True
+        UserForm1.Frame7.visible = True
+        UserForm1.Frame8.visible = True
+        UserForm1.Frame9.visible = True
+        UserForm1.Frame10.visible = True
+        UserForm1.Caption = "100% Complete"
+        UserForm1.Repaint
+     Case 200
+        UserForm1.Frame0.visible = False
+        UserForm1.Frame1.visible = False
+        UserForm1.Frame2.visible = False
+        UserForm1.Frame3.visible = False
+        UserForm1.Frame4.visible = False
+        UserForm1.Frame5.visible = False
+        UserForm1.Frame6.visible = False
+        UserForm1.Frame7.visible = False
+        UserForm1.Frame8.visible = False
+        UserForm1.Frame9.visible = False
+        UserForm1.Frame10.visible = False
+        UserForm1.Caption = "Parametrage"
+        UserForm1.Repaint
+    End Select
+
+
+
+End Function
+
+Function IsFileOpen(filename As String)
+    Dim filenum As Integer, errnum As Integer
+
+    On Error Resume Next   ' Turn error checking off.
+    filenum = FreeFile()   ' Get a free file number.
+    ' Attempt to open the file and lock it.
+    Open filename For Input Lock Read As #filenum
+    Close filenum          ' Close the file.
+    errnum = Err           ' Save the error number that occurred.
+    On Error GoTo 0        ' Turn error checking back on.
+
+    ' Check to see which error occurred.
+    Select Case errnum
+
+        ' No error occurred.
+        ' File is NOT already open by another user.
+        Case 0
+         IsFileOpen = False
+
+        ' Error number for "Permission Denied."
+        ' File is already opened by another user.
+        Case 70
+            IsFileOpen = True
+
+        ' Another error occurred.
+        Case Else
+            Error errnum
+    End Select
+
+End Function
+
+Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+   If CloseMode = vbFormControlMenu Then
+   On Error Resume Next
+   xlWB.Saved = True
+   On Error Resume Next
+   xlApp.DisplayAlerts = False
+   xlWB.Save
+   xlWB.Save
+   xlApp.quit
+   xlApp.quit
+   xlApp.DisplayAlerts = True
+   'MsgBox "GoodBye ;)"
+    End If
+End Sub
+
+Function IsProcessRunning(process As String)
+    Dim objList As Object
+
+    Set objList = GetObject("winmgmts:") _
+        .ExecQuery("select * from win32_process where name='" & process & "'")
+
+    If objList.Count > 0 Then
+        IsProcessRunning = True
+    Else
+           IsProcessRunning = False
+    End If
+
+End Function
+
+Sub Refresh_All_Data_Connections()
+
+    For Each objConnection In ActiveWorkbook.Connections
+        'Get current background-refresh value
+        bBackground = objConnection.ODBConnection.BackgroundQuery
+
+        'Temporarily disable background-refresh
+        objConnection.ODBConnection.BackgroundQuery = False
+
+        'Refresh this connection
+        objConnection.Refresh
+
+        'Set background-refresh value back to original value
+        objConnection.ODBConnection.BackgroundQuery = bBackground
+    Next
+
+    MsgBox "Finished refreshing all data connections"
+
+End Sub
+
+
+Private Sub correctMates()
+swModel.ClearSelection2 True
+If CheckBox4.Value = True Then
+boolstatus = swModel.Extension.SelectByID2("Coïncidente217", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Largeur9", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Distance48", "MATE", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditSuppress2
+boolstatus = swModel.Extension.SelectByID2("Largeur13", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+ElseIf CheckBox4.Value = False Then
+
+boolstatus = swModel.Extension.SelectByID2("Coïncidente217", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Largeur9", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+boolstatus = swModel.Extension.SelectByID2("Largeur13", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+If CheckBox3.Value = True Then
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Distance48", "MATE", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditSuppress2
+
+swModel.ClearSelection2 True
+Else
+swModel.ClearSelection2 True
+boolstatus = swModel.Extension.SelectByID2("Distance48", "MATE", 0, 0, 0, True, 0, Nothing, 0)
+swModel.EditUnsuppress2
+swModel.ClearSelection2 True
+End If
+End If
+
+
+If CheckBox2.Value = False Then
+If CheckBox8.Value = True Then
+boolstatus = swModel.Extension.SelectByID2("Coïncidente220", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditUnuppress2
+Else
+boolstatus = swModel.Extension.SelectByID2("Coïncidente220", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+End If
+
+
+Else
+boolstatus = swModel.Extension.SelectByID2("Coïncidente220", "MATE", 0, 0, 0, False, 0, Nothing, 0)
+swModel.EditSuppress2
+End If
+
+
+
+End Sub
